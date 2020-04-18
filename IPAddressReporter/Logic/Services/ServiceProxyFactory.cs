@@ -1,9 +1,6 @@
 ﻿using IPAddressReporter.Configuration;
 using IPAddressReporter.Logging;
 using IPAddressReporter.Logic.Services.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace IPAddressReporter.Logic.Services
 {
@@ -16,6 +13,11 @@ namespace IPAddressReporter.Logic.Services
 		{
 			_appSettings = appSettings;
 			_logger = logger;
+		}
+
+		public IDNSUpdateService GetDNSUpdateService()
+		{
+			return new GoDaddyDNSUpdateService.GoDaddyDNSUpdateService(_appSettings, _logger);
 		}
 
 		public IEmailService GetEmailService()

@@ -2,9 +2,7 @@
 using IPAddressReporter.Logging;
 using IPAddressReporter.Logic.Services.Interfaces;
 using System;
-using System.Collections.Generic;
 using System.Net;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -38,10 +36,26 @@ namespace IPAddressReporter.Logic
 		public async Task<bool> ReportIPAddress(CancellationToken cancellationToken = default)
 		{
 			var ipAddress = await GetExternalIPAddressAsync(cancellationToken);
-			if (ipAddress.Equals(_currentIpAddress))
-				return false;
 
+			if (ipAddress.Equals(_currentIpAddress))
+			{
+				_logger.Log($"IP Address did not change, {ipAddress}");
+				return false;
+			}
+
+			_logger.Log($"IP changed, old IP: '{_currentIpAddress}', new IP: '{ipAddress}'");
 			_currentIpAddress = ipAddress;
+
+			try
+			{
+				var dnsUpdateService = _serviceProxyFactory.GetDNSUpdateService();
+				await dnsUpdateService.UpdateIPOnDNS(_appSettings.Host, ipAddress, cancellationToken);
+			}
+			catch(Exception ex)
+			{
+				// Don't bomb if ip couldn't be updated.
+				_logger.Log(ex.ToString());
+			}
 
 			await SendIPAddressViaEmail(ipAddress, cancellationToken);
 
@@ -61,11 +75,11 @@ namespace IPAddressReporter.Logic
 		{
 			const string ipResolverServerUrl = "http://checkip.amazonaws.com/";
 			using var webClient = new System.Net.Http.HttpClient();
-			
+
 			_logger.Log($"Sending GET request to {ipResolverServerUrl}");
-			
+
 			var result = await webClient.GetAsync(ipResolverServerUrl, cancellationToken);
-			
+
 			if (!result.IsSuccessStatusCode)
 			{
 				_logger.Log("Failed to obtain external IP address");
@@ -79,8 +93,8 @@ namespace IPAddressReporter.Logic
 			if (IPAddress.TryParse(ipAddressString.Trim(), out var ipAddress))
 				return ipAddress;
 
-			_logger.Log($"Unable to parse IP Address: {ipAddressString}");
-			throw new Exception();
+			// Stop processing
+			throw new Exception($"Unable to parse IP Address: {ipAddressString}");
 		}
 	}
 }

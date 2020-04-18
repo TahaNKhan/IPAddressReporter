@@ -24,17 +24,18 @@ namespace IPAddressReporter
 				.Build();
 
 			var appSettings = config.Get<AppSettings>();
+			var logger = new LoggerFactory(appSettings)
+				.BuildLogger();
 
 			var serviceProvider = new ServiceCollection()
 				.AddSingleton(appSettings)
-				.AddSingleton<ILogger, FileLogger>()
+				.AddSingleton(logger)
 				.AddSingleton<Logic.Services.Interfaces.IServiceProxyFactory, ServiceProxyFactory>()
 				.AddSingleton<IReporterTask, ReporterTask>()
 				.BuildServiceProvider();
 
 			while (true)
 			{
-				var logger = serviceProvider.GetService<ILogger>();
 				logger.Log("IP reporter started!");
 				try
 				{

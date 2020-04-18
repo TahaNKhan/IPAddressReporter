@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 
 namespace IPAddressReporter.Configuration
 {
@@ -11,11 +9,20 @@ namespace IPAddressReporter.Configuration
 		public bool SendEmails { get; set; }
 		public EmailCredentials EmailCredentials { get; set; }
 		public double WaitTimeSeconds { get; set; }
+		public string Host { get; set; }
+		public APISecrets GoDaddyAPISecrets { get; set; }
 	}
 	public class EmailCredentials
 	{
 		public string Email { get; set; }
 		public string EmailPassword { get; set; }
 		public string EmailDisplayName { get; set; }
+	}
+
+	public class APISecrets
+	{
+		public string URL { get; set; }
+		public string APIKey { get; set; }
+		public string APISecret { get; set; }
 	}
 }

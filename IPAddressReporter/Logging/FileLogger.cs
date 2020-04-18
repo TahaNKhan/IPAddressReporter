@@ -1,6 +1,5 @@
 ﻿using IPAddressReporter.Configuration;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
@@ -10,25 +9,21 @@ namespace IPAddressReporter.Logging
 	{
 		private readonly StringBuilder _logs;
 		private readonly string _logFileLocation;
-		public const string DefaultLogFileLocation = "D:\\Logs\\IPAddressReporter.log";
 
 		public FileLogger(AppSettings appSettings)
 		{
-			_logFileLocation = !string.IsNullOrEmpty(appSettings?.LogFileLocation) ? appSettings.LogFileLocation : DefaultLogFileLocation;
+			_logFileLocation = appSettings?.LogFileLocation;
 			_logs = new StringBuilder();
 		}
 
 		public void Log(string str)
 		{
-			str = str.Replace(Environment.NewLine, " ");
-			str = str.Replace("\n", " ");
-			str = str.Replace("\r", " ");
-			_logs.Append($"{DateTimeOffset.Now:MMM dd yyyy HH:mm:ss zzz} - {str}{Environment.NewLine}");
+			_logs.Append(ILogger.FormatLog(str));
 		}
 
 		public void Publish()
 		{
-			File.AppendAllText(_logFileLocation, _logs.ToString());
+			File.AppendAllText(_logFileLocation + $"\\IPAddressReporterLogs-{DateTimeOffset.Now:yyyy-MM-dd}.log", _logs.ToString());
 		}
 	}
 }
