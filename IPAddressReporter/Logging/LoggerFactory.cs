@@ -17,8 +17,13 @@ namespace IPAddressReporter.Logging
 		public ILogger BuildLogger()
 		{
 			if (string.IsNullOrEmpty(_appSettings.LogFileLocation))
-				return new ConsoleLogger();
-			return new FileLogger(_appSettings);
+				return BuildConsoleLogger();
+			return BuildFileLogger();
 		}
+
+		public ILogger BuildFileLogger() => new FileLogger(_appSettings);
+
+		public ILogger BuildConsoleLogger() => new ConsoleLogger();
+
 	}
 }

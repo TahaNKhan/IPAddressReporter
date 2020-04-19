@@ -10,22 +10,19 @@ namespace IPAddressReporter.Logic
 {
 	public interface IReporterTask
 	{
-		Task<bool> ReportIPAddress(CancellationToken cancellationToken = default);
+		Task<bool> ReportIPAddress(ILogger logger, CancellationToken cancellationToken = default);
 	}
 
 	public class ReporterTask : IReporterTask
 	{
 		private readonly IServiceProxyFactory _serviceProxyFactory;
-		private readonly ILogger _logger;
 		private readonly AppSettings _appSettings;
 
-		private IPAddress _currentIpAddress;
+		private static IPAddress _currentIpAddress = null;
 
-		public ReporterTask(IServiceProxyFactory serviceProxyFactory, ILogger logger, AppSettings appSettings)
+		public ReporterTask(IServiceProxyFactory serviceProxyFactory, ILoggerFactory loggerFactory, AppSettings appSettings)
 		{
-			_currentIpAddress = null;
 			_serviceProxyFactory = serviceProxyFactory;
-			_logger = logger;
 			_appSettings = appSettings;
 		}
 
@@ -33,58 +30,58 @@ namespace IPAddressReporter.Logic
 		/// Looks up the external IP and reports if it has changed
 		/// </summary>
 		/// <returns>true if IP address changed</returns>
-		public async Task<bool> ReportIPAddress(CancellationToken cancellationToken = default)
+		public async Task<bool> ReportIPAddress(ILogger logger, CancellationToken cancellationToken = default)
 		{
-			var ipAddress = await GetExternalIPAddressAsync(cancellationToken);
+			var ipAddress = await GetExternalIPAddressAsync(logger, cancellationToken);
 
 			if (ipAddress.Equals(_currentIpAddress))
 			{
-				_logger.Log($"IP Address did not change, {ipAddress}");
+				logger.LogInfo($"IP Address did not change, {ipAddress}");
 				return false;
 			}
 
-			_logger.Log($"IP changed, old IP: '{_currentIpAddress}', new IP: '{ipAddress}'");
+			logger.LogInfo($"IP changed, old IP: '{_currentIpAddress}', new IP: '{ipAddress}'");
 			_currentIpAddress = ipAddress;
 
 			try
 			{
-				var dnsUpdateService = _serviceProxyFactory.GetDNSUpdateService();
+				var dnsUpdateService = _serviceProxyFactory.GetDNSUpdateService(logger);
 				await dnsUpdateService.UpdateIPOnDNS(_appSettings.Host, ipAddress, cancellationToken);
 			}
 			catch(Exception ex)
 			{
 				// Don't bomb if ip couldn't be updated.
-				_logger.Log(ex.ToString());
+				logger.LogError(ex.ToString());
 			}
 
-			await SendIPAddressViaEmail(ipAddress, cancellationToken);
+			await SendIPAddressViaEmail(ipAddress, logger, cancellationToken);
 
 			return true;
 		}
 
-		internal virtual async Task SendIPAddressViaEmail(IPAddress ipAddress, CancellationToken cancellationToken = default)
+		internal virtual async Task SendIPAddressViaEmail(IPAddress ipAddress, ILogger logger, CancellationToken cancellationToken = default)
 		{
 			const string subject = "Current IP Address";
 			var to = _appSettings.RecipientEmails;
 			var body = $"Your current IP Address is {ipAddress}";
-			var emailService = _serviceProxyFactory.GetEmailService();
+			var emailService = _serviceProxyFactory.GetEmailService(logger);
 			await emailService.SendEmailAsync(to, subject, body, cancellationToken);
 		}
 
-		internal virtual async Task<IPAddress> GetExternalIPAddressAsync(CancellationToken cancellationToken = default)
+		internal virtual async Task<IPAddress> GetExternalIPAddressAsync(ILogger logger, CancellationToken cancellationToken = default)
 		{
 			const string ipResolverServerUrl = "http://checkip.amazonaws.com/";
 			using var webClient = new System.Net.Http.HttpClient();
 
-			_logger.Log($"Sending GET request to {ipResolverServerUrl}");
+			logger.LogInfo($"Sending GET request to {ipResolverServerUrl}");
 
 			var result = await webClient.GetAsync(ipResolverServerUrl, cancellationToken);
 
 			if (!result.IsSuccessStatusCode)
 			{
-				_logger.Log("Failed to obtain external IP address");
-				_logger.Log($"Status code: {result.StatusCode}");
-				_logger.Log($"Response: {await result.Content?.ReadAsStringAsync()}");
+				logger.LogError("Failed to obtain external IP address");
+				logger.LogError($"Status code: {result.StatusCode}");
+				logger.LogError($"Response: {await result.Content?.ReadAsStringAsync()}");
 				throw new Exception();
 			}
 

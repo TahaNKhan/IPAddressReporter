@@ -24,32 +24,27 @@ namespace IPAddressReporter
 				.Build();
 
 			var appSettings = config.Get<AppSettings>();
-			var logger = new LoggerFactory(appSettings)
-				.BuildLogger();
 
 			var serviceProvider = new ServiceCollection()
 				.AddSingleton(appSettings)
-				.AddSingleton(logger)
+				.AddSingleton<ILoggerFactory, LoggerFactory>()
 				.AddSingleton<Logic.Services.Interfaces.IServiceProxyFactory, ServiceProxyFactory>()
-				.AddSingleton<IReporterTask, ReporterTask>()
+				.AddTransient<IReporterTask, ReporterTask>()
 				.BuildServiceProvider();
 
 			while (true)
 			{
-				logger.Log("IP reporter started!");
+				var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
+				var logger = loggerFactory.BuildLogger();
 				try
 				{
+					
 					var mainTask = serviceProvider.GetService<IReporterTask>();
-					var reportedIp = await mainTask.ReportIPAddress();
-					if (reportedIp)
-						logger.Log("IP change reported!");
-					else
-						logger.Log("IP address did not change");
-					logger.Log("IP reporter finished successfully!");
+					var reportedIp = await mainTask.ReportIPAddress(logger);
 				}
 				catch (Exception ex)
 				{
-					logger.Log(ex.ToString());
+					logger.LogError(ex.ToString());
 				}
 				finally
 				{

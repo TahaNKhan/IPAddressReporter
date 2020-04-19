@@ -38,13 +38,13 @@ namespace IPAddressReporter.Logic.Services.GoDaddyDNSUpdateService
 			
 			if (response.IsSuccessStatusCode)
 			{
-				_logger.Log("Updated IP at GoDaddy successfully.");
+				_logger.LogInfo("Updated IP at GoDaddy successfully.");
 				return;
 			}
 
-			_logger.Log("Failed to update IP at GoDaddy");
-			_logger.Log($"Status Code: {response.StatusCode}");
-			_logger.Log(await response.Content.ReadAsStringAsync());
+			_logger.LogInfo("Failed to update IP at GoDaddy");
+			_logger.LogInfo($"Status Code: {response.StatusCode}");
+			_logger.LogInfo(await response.Content.ReadAsStringAsync());
 		}
 
 		private HttpContent BuildDNSRecordRequest(IPAddress address)

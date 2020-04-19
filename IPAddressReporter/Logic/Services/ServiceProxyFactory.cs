@@ -8,21 +8,19 @@ namespace IPAddressReporter.Logic.Services
 	public class ServiceProxyFactory : IServiceProxyFactory
 	{
 		private readonly AppSettings _appSettings;
-		private readonly ILogger _logger;
-		public ServiceProxyFactory(AppSettings appSettings, ILogger logger)
+		public ServiceProxyFactory(AppSettings appSettings)
 		{
 			_appSettings = appSettings;
-			_logger = logger;
 		}
 
-		public IDNSUpdateService GetDNSUpdateService()
+		public IDNSUpdateService GetDNSUpdateService(ILogger logger)
 		{
-			return new GoDaddyDNSUpdateService.GoDaddyDNSUpdateService(_appSettings, _logger);
+			return new GoDaddyDNSUpdateService.GoDaddyDNSUpdateService(_appSettings, logger);
 		}
 
-		public IEmailService GetEmailService()
+		public IEmailService GetEmailService(ILogger logger)
 		{
-			return new GmailService(_appSettings, _logger);
+			return new GmailService(_appSettings, logger);
 		}
 	}
 }

@@ -16,14 +16,16 @@ namespace IPAddressReporter.Logging
 			_logs = new StringBuilder();
 		}
 
-		public void Log(string str)
+		void ILogger.Log(string str)
 		{
-			_logs.Append(ILogger.FormatLog(str));
+			_logs.Append(str);
 		}
 
 		public void Publish()
 		{
-			File.AppendAllText(_logFileLocation + $"\\IPAddressReporterLogs-{DateTimeOffset.Now:yyyy-MM-dd}.log", _logs.ToString());
+			var logFileName = _logFileLocation + $"\\IPAddressReporterLogs-{DateTimeOffset.Now:yyyy-MM-dd}.log";
+			File.AppendAllText(logFileName, _logs.ToString());
+			_logs.Clear();
 		}
 	}
 }

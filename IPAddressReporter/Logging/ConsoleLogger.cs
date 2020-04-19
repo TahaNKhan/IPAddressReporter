@@ -6,7 +6,7 @@ namespace IPAddressReporter.Logging
 {
 	public class ConsoleLogger : ILogger
 	{
-		public void Log(string log) => Console.WriteLine(ILogger.FormatLog(log));
+		void ILogger.Log(string log) => Console.WriteLine(log);
 
 		public void Publish() { }
 	}

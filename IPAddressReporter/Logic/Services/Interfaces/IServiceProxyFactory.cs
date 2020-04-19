@@ -1,8 +1,10 @@
-﻿namespace IPAddressReporter.Logic.Services.Interfaces
+﻿using IPAddressReporter.Logging;
+
+namespace IPAddressReporter.Logic.Services.Interfaces
 {
 	public interface IServiceProxyFactory
 	{
-		IEmailService GetEmailService();
-		IDNSUpdateService GetDNSUpdateService();
+		IEmailService GetEmailService(ILogger logger);
+		IDNSUpdateService GetDNSUpdateService(ILogger logger);
 	}
 }

@@ -24,26 +24,26 @@ namespace IPAddressReporter.Logic.Services
 		public async Task SendEmailAsync(IEnumerable<string> recepients, string subject, string body, CancellationToken cancellationToken = default)
 		{
 			using var smtpClient = BuildSmtpClient();
-			_logger.Log($"Sending email to:");
+			_logger.LogInfo($"Sending email to:");
 			foreach (var to in recepients)
 			{
 				try
 				{
-					_logger.Log(to);
+					_logger.LogInfo(to);
 					var mailMessage = GenerateMailMessage(to, subject, body);
 					if (_appSettings.SendEmails)
 						await smtpClient.SendMailAsync(mailMessage);
 					else
-						_logger.Log($"Did not send email to {to} due to config settings");
+						_logger.LogInfo($"Did not send email to {to} due to config settings");
 				}
 				catch (Exception ex)
 				{
-					_logger.Log($"Failed to send email to: {to}");
-					_logger.Log(ex.ToString());
+					_logger.LogError($"Failed to send email to: {to}");
+					_logger.LogError(ex.ToString());
 					continue;
 				}
 			}
-			_logger.Log("Emails processed!");
+			_logger.LogInfo("Emails processed!");
 		}
 
 		internal virtual MailMessage GenerateMailMessage(string to, string subject, string body)
@@ -60,13 +60,13 @@ namespace IPAddressReporter.Logic.Services
 
 		internal virtual SmtpClient BuildSmtpClient()
 		{
-			_logger.Log("Connecting to smtp.gmail.com:587");
+			_logger.LogInfo("Connecting to smtp.gmail.com:587");
 			var smtpClient = new SmtpClient("smtp.gmail.com", 587)
 			{
 				Credentials = new NetworkCredential(_appSettings.EmailCredentials.Email, _appSettings.EmailCredentials.EmailPassword),
 				EnableSsl = true
 			};
-			_logger.Log("Connected to gmail!");
+			_logger.LogInfo("Connected to gmail!");
 			return smtpClient;
 		}
 	}
