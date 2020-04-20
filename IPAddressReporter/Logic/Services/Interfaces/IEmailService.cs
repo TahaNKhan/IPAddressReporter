@@ -8,6 +8,6 @@ namespace IPAddressReporter.Logic.Services.Interfaces
 {
 	public interface IEmailService
 	{
-		Task SendEmailAsync(IEnumerable<string> recepients, string subject, string body, CancellationToken cancellationToken = default);
+		Task SendEmailAsync(IList<string> recepients, string subject, string body, CancellationToken cancellationToken = default);
 	}
 }

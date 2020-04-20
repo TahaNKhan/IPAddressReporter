@@ -3,6 +3,7 @@ using IPAddressReporter.Logging;
 using IPAddressReporter.Logic.Services.Interfaces;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Mail;
 using System.Threading;
@@ -21,8 +22,10 @@ namespace IPAddressReporter.Logic.Services
 			_appSettings = appSettings;
 		}
 
-		public async Task SendEmailAsync(IEnumerable<string> recepients, string subject, string body, CancellationToken cancellationToken = default)
+		public async Task SendEmailAsync(IList<string> recepients, string subject, string body, CancellationToken cancellationToken = default)
 		{
+			if (!recepients.Any())
+				return;
 			using var smtpClient = BuildSmtpClient();
 			_logger.LogInfo($"Sending email to:");
 			foreach (var to in recepients)

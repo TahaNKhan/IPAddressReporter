@@ -29,6 +29,7 @@ namespace IPAddressReporter
 				.AddSingleton(appSettings)
 				.AddSingleton<ILoggerFactory, LoggerFactory>()
 				.AddSingleton<Logic.Services.Interfaces.IServiceProxyFactory, ServiceProxyFactory>()
+				.AddSingleton<DataAccess.Interfaces.IDataContextFactory, DataAccess.FileDataContextFactory>()
 				.AddTransient<IReporterTask, ReporterTask>()
 				.BuildServiceProvider();
 
