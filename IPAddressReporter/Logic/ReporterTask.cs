@@ -1,5 +1,6 @@
 ﻿using IPAddressReporter.Configuration;
 using IPAddressReporter.DataAccess.Interfaces;
+using IPAddressReporter.Helpers;
 using IPAddressReporter.Logging;
 using IPAddressReporter.Logic.Services.Interfaces;
 using System;
@@ -37,9 +38,11 @@ namespace IPAddressReporter.Logic
 		/// <returns>true if IP address changed</returns>
 		public async Task<bool> ReportIPAddress(ILogger logger, CancellationToken cancellationToken = default)
 		{
+			if (!ShouldIPAddressBeUpdated(logger))
+				return false;
+
 			if (_currentIpAddress == null)
 				_currentIpAddress = await LoadIPAddress(logger);
-
 
 			var ipAddress = await GetExternalIPAddressAsync(logger, cancellationToken);
 
@@ -74,6 +77,22 @@ namespace IPAddressReporter.Logic
 				// Don't bomb if IP couldn't be updated.
 				logger.LogError(ex.ToString());
 			}
+		}
+
+		private bool ShouldIPAddressBeUpdated(ILogger logger)
+		{
+			if (!NetworkHelpers.IsNetworkConnected())
+			{
+				logger.LogError("No connection to the internet");
+				return false;
+			}
+
+			if (NetworkHelpers.IsVPNOn())
+			{
+				logger.LogInfo("VPN is on, IP address will not be updated.");
+				return false;
+			}
+			return true;
 		}
 
 		private async Task<IPAddress> LoadIPAddress(ILogger logger)

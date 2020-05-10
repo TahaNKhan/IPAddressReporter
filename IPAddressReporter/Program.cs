@@ -41,7 +41,7 @@ namespace IPAddressReporter
 				{
 					
 					var mainTask = serviceProvider.GetService<IReporterTask>();
-					var reportedIp = await mainTask.ReportIPAddress(logger);
+					_ = await mainTask.ReportIPAddress(logger);
 				}
 				catch (Exception ex)
 				{
