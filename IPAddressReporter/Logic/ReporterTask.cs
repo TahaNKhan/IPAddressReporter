@@ -38,7 +38,7 @@ namespace IPAddressReporter.Logic
 		/// <returns>true if IP address changed</returns>
 		public async Task<bool> ReportIPAddress(ILogger logger, CancellationToken cancellationToken = default)
 		{
-			if (!ShouldIPAddressBeUpdated(logger))
+			if (!await ShouldIPAddressBeUpdated(logger))
 				return false;
 
 			if (_currentIpAddress == null)
@@ -55,7 +55,7 @@ namespace IPAddressReporter.Logic
 			await SaveIPAddress(ipAddress, logger);
 
 			logger.LogInfo($"IP changed, old IP: '{_currentIpAddress}', new IP: '{ipAddress}'");
-			
+
 			_currentIpAddress = ipAddress;
 
 			await UpdateIPOnDNS(ipAddress, logger, cancellationToken);
@@ -79,9 +79,9 @@ namespace IPAddressReporter.Logic
 			}
 		}
 
-		private bool ShouldIPAddressBeUpdated(ILogger logger)
+		private async Task<bool> ShouldIPAddressBeUpdated(ILogger logger)
 		{
-			if (!NetworkHelpers.IsNetworkConnected())
+			if (!await NetworkHelpers.IsNetworkConnected())
 			{
 				logger.LogError("No connection to the internet");
 				return false;
