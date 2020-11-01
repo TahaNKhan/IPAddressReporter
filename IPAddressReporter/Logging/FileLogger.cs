@@ -1,6 +1,7 @@
 ﻿using IPAddressReporter.Configuration;
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace IPAddressReporter.Logging
@@ -23,9 +24,17 @@ namespace IPAddressReporter.Logging
 
 		public void Publish()
 		{
-			var logFileName = _logFileLocation + $"\\IPAddressReporterLogs-{DateTimeOffset.Now:yyyy-MM-dd}.log";
+			var logFileName = GetLogFileName();
 			File.AppendAllText(logFileName, _logs.ToString());
 			_logs.Clear();
+		}
+
+		private string GetLogFileName()
+		{
+			if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+				return _logFileLocation + $"/IPAddressReporterLogs-{DateTimeOffset.Now:yyyy-MM-dd}.log";
+
+			return _logFileLocation + $"\\IPAddressReporterLogs-{DateTimeOffset.Now:yyyy-MM-dd}.log";
 		}
 	}
 }

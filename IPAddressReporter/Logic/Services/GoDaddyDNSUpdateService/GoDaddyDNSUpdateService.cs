@@ -69,6 +69,9 @@ namespace IPAddressReporter.Logic.Services.GoDaddyDNSUpdateService
 			var apiKey = _appSettings.GoDaddyAPISecrets.APIKey;
 			var apiSecret = _appSettings.GoDaddyAPISecrets.APISecret;
 
+			if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(apiSecret))
+				throw new Exception("GoDaddy apiKey or apiSecret is not setup");
+
 			client.DefaultRequestHeaders.Add("Authorization", $"sso-key {apiKey}:{apiSecret}");
 		}
 	}

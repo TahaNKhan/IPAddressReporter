@@ -22,12 +22,23 @@ namespace IPAddressReporter.Helpers
 			static bool isNetworkVpnAndUp(NetworkInterface networkInterface)
 			{
 				var isNetworkUp = networkInterface.OperationalStatus == OperationalStatus.Up;
-				var isVpnNetwork = networkInterface.Description.ToLowerInvariant().Contains("vpn");
+				var isVpnNetwork = IsVPNNetworkName(networkInterface.Description);
 				return isNetworkUp && isVpnNetwork;
 			}
-			var isNetworkAvailable = IsNetworkConnected();
 			var vpnNetworkExists = NetworkInterface.GetAllNetworkInterfaces().Any(isNetworkVpnAndUp);
 			return vpnNetworkExists;
+		}
+
+		private static bool IsVPNNetworkName(string networkInterfaceName)
+		{
+			var vpnNameList = new HashSet<string>
+			{
+				"vpn",
+				"nord",
+				"surfshark"
+			};
+
+			return vpnNameList.Contains(networkInterfaceName.ToLowerInvariant());
 		}
 	}
 }
