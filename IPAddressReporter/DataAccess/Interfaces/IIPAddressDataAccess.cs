@@ -8,9 +8,9 @@ using System.Threading.Tasks;
 
 namespace IPAddressReporter.DataAccess.Interfaces
 {
-	public interface IIPAddressDataAccess
+    public interface IIPAddressDataAccess
 	{
-		Task<IPAddress> LoadIPAddress(ILogger logger = null);
-		Task SaveIPAddress(IPAddress address, ILogger logger = null);
+		Task<IPReporterState> LoadIPReporterState(ILogger logger = default);
+		Task SaveIPAddress(IPReporterState ipReporterState, ILogger logger = default);
 	}
 }

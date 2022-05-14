@@ -1,5 +1,8 @@
 ﻿using IPAddressReporter.Configuration;
+using IPAddressReporter.DataAccess;
 using IPAddressReporter.DataAccess.Interfaces;
+using IPAddressReporter.Exceptions;
+using IPAddressReporter.Extensions;
 using IPAddressReporter.Helpers;
 using IPAddressReporter.Logging;
 using IPAddressReporter.Logic.Services.Interfaces;
@@ -12,152 +15,179 @@ using System.Threading.Tasks;
 
 namespace IPAddressReporter.Logic
 {
-	public interface IReporterTask
-	{
-		Task<bool> ReportIPAddress(ILogger logger, CancellationToken cancellationToken = default);
-	}
+    public interface IReporterTask
+    {
+        Task<bool> ReportIPAddress(ILogger logger, CancellationToken cancellationToken = default);
+    }
 
-	public class ReporterTask : IReporterTask
-	{
-		private readonly IServiceProxyFactory _serviceProxyFactory;
-		private readonly IDataContextFactory _dataContextFactory;
-		private readonly AppSettings _appSettings;
+    public class ReporterTask : IReporterTask
+    {
+        private readonly IServiceProxyFactory _serviceProxyFactory;
+        private readonly IDataContextFactory _dataContextFactory;
+        private readonly AppSettings _appSettings;
 
-		private static IPAddress _currentIpAddress = null;
+        private static IPReporterState _ipReporterState = null;
 
-		public ReporterTask(IServiceProxyFactory serviceProxyFactory, IDataContextFactory dataContextFactory, AppSettings appSettings)
-		{
-			_serviceProxyFactory = serviceProxyFactory;
-			_dataContextFactory = dataContextFactory;
-			_appSettings = appSettings;
-		}
+        public ReporterTask(IServiceProxyFactory serviceProxyFactory, IDataContextFactory dataContextFactory, AppSettings appSettings)
+        {
+            _serviceProxyFactory = serviceProxyFactory;
+            _dataContextFactory = dataContextFactory;
+            _appSettings = appSettings;
+        }
 
-		/// <summary>
-		/// Looks up the external IP and reports if it has changed
-		/// </summary>
-		/// <returns>true if IP address changed</returns>
-		public async Task<bool> ReportIPAddress(ILogger logger, CancellationToken cancellationToken = default)
-		{
-			if (!await ShouldIPAddressBeUpdated(logger))
-				return false;
+        /// <summary>
+        /// Looks up the external IP and reports if it has changed
+        /// </summary>
+        /// <returns>true if IP address changed</returns>
+        public async Task<bool> ReportIPAddress(ILogger logger, CancellationToken cancellationToken = default)
+        {
+            if (!await ShouldIPAddressBeUpdated(logger))
+                return false;
 
-			if (_currentIpAddress == null)
-				_currentIpAddress = await LoadIPAddress(logger);
+            if (_ipReporterState == null)
+                _ipReporterState = await LoadState(logger);
 
-			var ipAddress = await GetExternalIPAddressAsync(logger, cancellationToken);
+            var ipAddress = await GetExternalIPAddressAsync(logger, cancellationToken);
 
-			if (ipAddress.Equals(_currentIpAddress))
-			{
-				logger.LogInfo($"IP Address did not change, {ipAddress}");
-				return false;
-			}
+            var ipAddressChanged = ipAddress == null || !ipAddress.Equals(_ipReporterState?.IPAddress.ToIPAddress());
 
-			await SaveIPAddress(ipAddress, logger);
+            if (ipAddressChanged)
+            {
+                logger.LogInfo($"IP changed, old IP: '{_ipReporterState?.IPAddress}', new IP: '{ipAddress?.ToString()}'");
+            }
+            else
+            {
+                logger.LogInfo($"IP Address did not change, {ipAddress}");
+            }
 
-			logger.LogInfo($"IP changed, old IP: '{_currentIpAddress}', new IP: '{ipAddress}'");
+            var updatedDNS = _ipReporterState?.IsDNSUpdated ?? false;
+            var sentNotificaiton = _ipReporterState?.IsIPNotificationSent ?? false;
 
-			_currentIpAddress = ipAddress;
+            if (!updatedDNS || ipAddressChanged)
+                updatedDNS = await UpdateIPOnDNS(ipAddress, logger, cancellationToken);
 
-			await UpdateIPOnDNS(ipAddress, logger, cancellationToken);
+            if (!sentNotificaiton || ipAddressChanged)
+                sentNotificaiton = await SendIPAddressViaEmail(ipAddress, logger, cancellationToken);
 
-			await SendIPAddressViaEmail(ipAddress, logger, cancellationToken);
+            var state = new IPReporterState
+            {
+                IPAddress = ipAddress.ToString(),
+                IsDNSUpdated = updatedDNS,
+                IsIPNotificationSent = sentNotificaiton
+            };
 
-			return true;
-		}
+            await SaveIPReporterState(state, logger);
 
-		private async Task UpdateIPOnDNS(IPAddress address, ILogger logger, CancellationToken cancellationToken = default)
-		{
-			try
-			{
-				var dnsUpdateService = _serviceProxyFactory.GetDNSUpdateService(logger);
-				await dnsUpdateService.UpdateIPOnDNS(_appSettings.Host, address, cancellationToken);
-			}
-			catch (Exception ex)
-			{
-				// Don't bomb if IP couldn't be updated.
-				logger.LogError(ex.ToString());
-			}
-		}
+            return true;
+        }
 
-		private async Task<bool> ShouldIPAddressBeUpdated(ILogger logger)
-		{
-			if (!await NetworkHelpers.IsNetworkConnected())
-			{
-				logger.LogError("No connection to the internet");
-				return false;
-			}
+        /// <summary>
+        /// Updates IP on DNS server
+        /// </summary>
+        /// <returns>true if successful, false otherwise</returns>
+        private async Task<bool> UpdateIPOnDNS(IPAddress address, ILogger logger, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var dnsUpdateService = _serviceProxyFactory.GetDNSUpdateService(logger);
+                await dnsUpdateService.UpdateIPOnDNS(_appSettings.Host, address, cancellationToken);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                // Don't bomb if IP couldn't be updated.
+                logger.LogError(ex.ToString());
+                return false;
+            }
+        }
 
-			if (NetworkHelpers.IsVPNOn())
-			{
-				logger.LogInfo("VPN is on, IP address will not be updated.");
-				return false;
-			}
-			return true;
-		}
+        private async Task<bool> ShouldIPAddressBeUpdated(ILogger logger)
+        {
+            if (!await NetworkHelpers.IsNetworkConnected())
+            {
+                logger.LogError("No connection to the internet");
+                return false;
+            }
 
-		private async Task<IPAddress> LoadIPAddress(ILogger logger)
-		{
-			try
-			{
-				using var dataContext = _dataContextFactory.Construct();
-				var ipDataAccess = dataContext.GetIPAddressDataAccess();
-				return await ipDataAccess.LoadIPAddress(logger);
-			}
-			catch (Exception ex)
-			{
-				// Don't bomb when reading from file.
-				logger.LogError($"Something bad happened when reading IP from file: {ex}");
-			}
-			return null;
-		}
+            if (NetworkHelpers.IsVPNOn())
+            {
+                logger.LogInfo("VPN is on, IP address will not be updated.");
+                return false;
+            }
+            return true;
+        }
 
-		internal virtual async Task SaveIPAddress(IPAddress ipAddress, ILogger logger)
-		{
-			try
-			{
-				using var dataContext = _dataContextFactory.Construct();
-				var ipDataAccess = dataContext.GetIPAddressDataAccess();
-				await ipDataAccess.SaveIPAddress(ipAddress, logger);
-			}
-			catch (Exception ioEx)
-			{
-				logger.LogError($"Failed to save IP address: {ioEx}");
-			}
-		}
+        private async Task<IPReporterState> LoadState(ILogger logger)
+        {
+            try
+            {
+                using var dataContext = _dataContextFactory.Construct();
+                var ipDataAccess = dataContext.GetIPAddressDataAccess();
+                return await ipDataAccess.LoadIPReporterState(logger);
+            }
+            catch (Exception ex)
+            {
+                // Don't bomb when reading from file.
+                logger.LogError($"Something bad happened when reading IP from file: {ex}");
+            }
+            return null;
+        }
 
-		internal virtual async Task SendIPAddressViaEmail(IPAddress ipAddress, ILogger logger, CancellationToken cancellationToken = default)
-		{
-			const string subject = "Current IP Address";
-			var to = _appSettings.RecipientEmails.ToList();
-			var body = $"Your current IP Address is {ipAddress}";
-			var emailService = _serviceProxyFactory.GetEmailService(logger);
-			await emailService.SendEmailAsync(to, subject, body, cancellationToken);
-		}
+        internal virtual async Task SaveIPReporterState(IPReporterState ipReporterState, ILogger logger)
+        {
+            try
+            {
+                using var dataContext = _dataContextFactory.Construct();
+                var ipDataAccess = dataContext.GetIPAddressDataAccess();
+                await ipDataAccess.SaveIPAddress(ipReporterState, logger);
+            }
+            catch (Exception ioEx)
+            {
+                logger.LogError($"Failed to save IP address: {ioEx}");
+            }
+        }
 
-		internal virtual async Task<IPAddress> GetExternalIPAddressAsync(ILogger logger, CancellationToken cancellationToken = default)
-		{
-			const string ipResolverServerUrl = "http://checkip.amazonaws.com/";
-			using var webClient = new System.Net.Http.HttpClient();
+        internal virtual async Task<bool> SendIPAddressViaEmail(IPAddress ipAddress, ILogger logger, CancellationToken cancellationToken = default)
+        {
+            const string subject = "Current IP Address";
+            var to = _appSettings.RecipientEmails.ToList();
+            var body = $"Your current IP Address is {ipAddress}";
+            try
+            {
+                var emailService = _serviceProxyFactory.GetEmailService(logger);
+                await emailService.SendEmailAsync(to, subject, body, cancellationToken);
+                return true;
+            } catch (CombinedException ex)
+            {
+                logger.LogError(ex.ToString());
+                return false;
+            }
+        }
 
-			logger.LogInfo($"Sending GET request to {ipResolverServerUrl}");
+        internal virtual async Task<IPAddress> GetExternalIPAddressAsync(ILogger logger, CancellationToken cancellationToken = default)
+        {
+            const string ipResolverServerUrl = "http://checkip.amazonaws.com/";
+            using var webClient = new HttpClient();
 
-			var result = await webClient.GetAsync(ipResolverServerUrl, cancellationToken);
+            logger.LogInfo($"Sending GET request to {ipResolverServerUrl}");
 
-			if (!result.IsSuccessStatusCode)
-			{
-				logger.LogError("Failed to obtain external IP address");
-				logger.LogError($"Status code: {result.StatusCode}");
-				logger.LogError($"Response: {await result.Content?.ReadAsStringAsync()}");
-				throw new HttpRequestException();
-			}
+            var result = await webClient.GetAsync(ipResolverServerUrl, cancellationToken);
 
-			var ipAddressString = await result.Content.ReadAsStringAsync();
+            if (!result.IsSuccessStatusCode)
+            {
+                logger.LogError("Failed to obtain external IP address");
+                logger.LogError($"Status code: {result.StatusCode}");
+                logger.LogError($"Response: {await result.Content?.ReadAsStringAsync()}");
+                throw new HttpRequestException();
+            }
 
-			if (IPAddress.TryParse(ipAddressString.Trim(), out var ipAddress))
-				return ipAddress;
+            var ipAddressString = await result.Content.ReadAsStringAsync();
 
-			// Stop processing
-			throw new Exception($"Unable to parse IP Address: {ipAddressString}");
-		}
-	}
+            if (IPAddress.TryParse(ipAddressString.Trim(), out var ipAddress))
+                return ipAddress;
+
+            // Stop processing
+            throw new Exception($"Unable to parse IP Address: {ipAddressString}");
+        }
+    }
 }

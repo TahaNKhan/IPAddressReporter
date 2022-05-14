@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "IPAddressReporter": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}

@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace IPAddressReporter
 {
-	class Program
+    class Program
 	{
 
 		static async Task Main(string[] args)

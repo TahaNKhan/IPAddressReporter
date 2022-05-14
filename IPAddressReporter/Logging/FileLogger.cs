@@ -14,6 +14,7 @@ namespace IPAddressReporter.Logging
 		public FileLogger(AppSettings appSettings)
 		{
 			_logFileLocation = appSettings?.LogFileLocation;
+			EnsureDirectoryExists(_logFileLocation);
 			_logs = new StringBuilder();
 		}
 
@@ -29,7 +30,12 @@ namespace IPAddressReporter.Logging
 			_logs.Clear();
 		}
 
-		private string GetLogFileName()
+        private void EnsureDirectoryExists(string logFileLocation)
+        {
+			Directory.CreateDirectory(logFileLocation);
+		}
+
+        private string GetLogFileName()
 		{
 			if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
 				return _logFileLocation + $"/IPAddressReporterLogs-{DateTimeOffset.Now:yyyy-MM-dd}.log";

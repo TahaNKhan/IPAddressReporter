@@ -1,4 +1,5 @@
 ﻿using IPAddressReporter.Configuration;
+using System;
 
 namespace IPAddressReporter.Logging
 {
@@ -18,7 +19,15 @@ namespace IPAddressReporter.Logging
 		{
 			if (string.IsNullOrEmpty(_appSettings.LogFileLocation))
 				return BuildConsoleLogger();
-			return BuildFileLogger();
+
+			try
+			{
+				return BuildFileLogger();
+			}
+			catch (Exception)
+            {
+				return BuildConsoleLogger();
+            }
 		}
 
 		public ILogger BuildFileLogger() => new FileLogger(_appSettings);
